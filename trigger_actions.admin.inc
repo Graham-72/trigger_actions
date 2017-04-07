@@ -336,7 +336,7 @@ function trigger_actions_lists($type) {
       array('data' => t('Possible Triggers'), 'field' => 'trigger_names'),
       array('data' => t('Edit Triggers'), 'field' => 'edit_triggers'),
     );
-
+    $row = array();
     foreach ($result as $action => $data) {
       $row[] = array(
         array('data' => $data['type']),
@@ -781,6 +781,7 @@ function trigger_actions_remove_orphans() {
 function trigger_actions_assignments() {
   module_load_include('inc', 'trigger_actions');
   $actions = array();
+  $row = array();
   $result = db_query("SELECT ta.aid, ta.trigger_name, a.type, a.label FROM {trigger_actions_assignments} ta LEFT JOIN {trigger_actions} a ON ta.aid = a.aid")->fetchAll(PDO::FETCH_ASSOC);
   foreach ($result as $data) {
     $actions[$data['aid']] = $data;
