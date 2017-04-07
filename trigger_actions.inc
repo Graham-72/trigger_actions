@@ -261,10 +261,12 @@ function trigger_actions_synchronize($delete_orphans = FALSE) {
         $this_module = 'trigger_actions';
       }
       $triggers = config_get("$this_module.settings","triggers.$action");
-      $trigger_names = ' ';
-      foreach($triggers as $this_trigger => $value) {
-        if($value == 1){
-          $trigger_names = $trigger_names.' '.$this_trigger;
+      if(isset($triggers)){
+        $trigger_names = ' ';
+        foreach($triggers as $this_trigger => $value) {
+          if($value == 1){
+            $trigger_names = $trigger_names.' '.$this_trigger;
+          }
         }
       }
       $is_configurable = function_exists($function) ? 2 : 0;
