@@ -1,0 +1,132 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the trigger_actions module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+
+function trigger_actions_schema() {
+  $schema['trigger_actions'] = array(
+    'description' => 'Stores action information.',
+    'fields' => array(
+      'aid' => array(
+        'description' => 'Primary Key: Unique actions ID, either a unique name or number',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '0',
+      ),
+      'type' => array(
+        'description' => 'The object that that action acts on (node, user, comment, system or custom types.)',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'callback' => array(
+        'description' => 'The callback function that executes when the action runs.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'parameters' => array(
+        'description' => 'Parameters to be passed to the callback function.',
+        'type' => 'blob',
+        'not null' => TRUE,
+        'size' => 'big',
+      ),
+      'label' => array(
+        'description' => 'Label of the action.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ' ',
+      ),
+      'configurable' => array(
+        'description' => 'Is 0 for a simple action, 1 for an advanced action 
+           without custom settings, or 2 for an advanced action with custom settings.',
+        'type' => 'int',
+        'size' => 'tiny',
+        'default' => 0,
+      ),
+      'node_type' => array(
+        'description' => 'Optional node type for the action.',
+        'type' => 'varchar',
+        'length' => 40,
+        'default' => ' ',
+      ),
+      'node_ID' => array(
+        'description' => 'Optional node ID for the action.',
+        'type' => 'int',
+        'size' => 'small',
+        'default' => 0,
+      ),
+      'trigger_names' => array(
+        'description' => 'Triggers that may invoke the action',
+        'type' => 'varchar',
+        'length' => 255,
+        'default' => ' ',
+      ),
+      'file' => array(
+        'description' => 'Relative path to a file that contains the callback function.',
+        'type' => 'varchar',
+        'length' => 255,
+        'default' => ' ',
+      ),
+    ),
+    'primary key' => array('aid'),
+  );
+
+
+  // The total index length (trigger and aid) must be less than 333. Since the aid
+  // field is 255 characters, the trigger field can have a maximum length of 78.
+  $schema['trigger_actions_assignments'] = array(
+    'description' => 'Maps actions to triggers for trigger_actions module.',
+    'fields' => array(
+      'trigger_name' => array(
+        'type' => 'varchar',
+        'length' => 78,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'Primary Key: The internal name of the Backdrop trigger; for example, node_insert.',
+      ),
+      'aid' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => "Primary Key: The ID of the action; either a name or an integer",
+      ),
+      'weight' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'The weight of the trigger assignment in relation to other triggers.',
+      ),
+    ),
+    'primary key' => array('trigger_name', 'aid'),
+    'foreign keys' => array(
+      'trigger_name' => array(
+        'table' => 'trigger_actions',
+        'columns' => array('aid' => 'aid'),
+      ),
+    ),
+  );
+
+  return $schema;
+}
+
+
+/**
+ * Implements hook_install().
+ */
+function trigger_install() {
+  // Do initial synchronization of actions in code and the database.
+  trigger_actions_synchronize();
+}
+

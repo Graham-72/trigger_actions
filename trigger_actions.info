@@ -1,0 +1,5 @@
+name = Trigger Actions
+description = Enables actions to be fired on certain system events, such as when new content is created.
+backdrop = 1.x
+type = module
+

@@ -1,0 +1,893 @@
+<?php
+
+/**
+ * @file
+ * Enables functions to be stored and executed at a later time when
+ * triggered by other modules or by one of Backdrop's core API hooks.
+ */
+
+
+/**
+ * Implements hook_menu().
+ */
+function trigger_actions_menu() {
+  $items['admin/structure/trigger_actions'] = array(
+    'title' => 'Triggers',
+    'description' => 'Configure when to execute actions.',
+    'page callback' => 'trigger_actions_assign',
+    'access arguments' => array('administer trigger_actions'),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'trigger_actions.admin.inc',
+    'weight' => 10,
+  );
+
+  $trigger_info = _trigger_actions_tab_information();
+  foreach ($trigger_info as $module => $module_name) {
+    $items["admin/structure/trigger_actions/$module"] = array(
+      'title' => $module_name,
+      'page callback' => 'trigger_actions_assign',
+      'page arguments' => array($module),
+      'access arguments' => array('administer trigger_actions'),
+      'type' => MENU_LOCAL_TASK,
+      'file' => 'trigger_actions.admin.inc',
+    );
+  }
+
+  $items['admin/structure/trigger_actions/unassign'] = array(
+    'title' => 'Unassign',
+    'description' => 'Unassign an action from a trigger.',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('trigger_actions_unassign'),
+    // Only accessible if there are any actions that can be unassigned.
+    'access callback' => 'trigger_actions_menu_unassign_access',
+    // Only output in the breadcrumb, not in menu trees.
+    'type' => MENU_VISIBLE_IN_BREADCRUMB,
+    'file' => 'trigger_actions.admin.inc',
+  );
+
+  $items['admin/structure/actions'] = array(
+    'title' => 'Actions',
+    'description' => 'Manage the actions defined for your site.',
+    'access arguments' => array('administer trigger_actions'),
+    'page callback' => 'trigger_actions_configure',
+    'file' => 'trigger_actions.admin.inc',
+    'weight' => 9,
+  );
+
+  $items['admin/structure/actions/simple'] = array(
+    'title' => 'Simple Actions',
+    'description' => 'Manage the actions defined for your site.',
+    'page callback' => 'trigger_actions_lists',
+    'page arguments' => array('simple'),
+    'access arguments' => array('administer trigger_actions'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 10,
+    'file' => 'trigger_actions.admin.inc',
+  );
+  $items['admin/structure/actions/advanced'] = array(
+    'title' => 'Advanced Actions',
+    'description' => 'Manage the actions defined for your site.',
+    'page callback' => 'trigger_actions_configure',
+    'page arguments' => array('advanced'),
+    'access arguments' => array('administer trigger_actions'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 12,
+    'file' => 'trigger_actions.admin.inc',
+  );
+  $items['admin/structure/actions/add'] = array(
+    'title' => 'Configurable Actions',
+    'description' => 'Add to the configured and advanced actions on this site.',
+    'page callback' => 'trigger_actions_lists',
+    'page arguments' => array('advanced'),
+    'access arguments' => array('administer trigger_actions'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 11,
+    'file' => 'trigger_actions.admin.inc',
+  );
+  $items['admin/structure/actions/assignments'] = array(
+    'title' => 'Current assignments',
+    'description' => 'List the current assignments of actions to triggers.',
+    'page callback' => 'trigger_actions_assignments',
+    'page arguments' => array('advanced'),
+    'access arguments' => array('administer trigger_actions'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 13,
+    'file' => 'trigger_actions.admin.inc',
+  );
+  $items['admin/structure/actions/remove/%/%'] = array(
+    'title' => 'Delete action',
+    'description' => 'Delete an action.',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('trigger_actions_remove', 4, 5),
+    'access arguments' => array('administer trigger_actions'),
+    'type' => MENU_CALLBACK,
+    'file' => 'trigger_actions.admin.inc',
+  );
+  $items['admin/structure/actions/orphan'] = array(
+      'title' => 'Remove orphans',
+      'page callback' => 'trigger_actions_remove_orphans',
+    'access arguments' => array('administer trigger_actions'),
+    'type' => MENU_CALLBACK,
+    'file' => 'trigger_actions.admin.inc',
+  );
+  $items['admin/structure/actions/simple/edit'] = array(
+    'title' => 'Configure triggers for a simple action',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('trigger_actions_simple_configure'),
+    'access arguments' => array('administer trigger_actions'),
+    'type' => MENU_VISIBLE_IN_BREADCRUMB,
+    'file' => 'trigger_actions.admin.inc',
+  );
+  $items['admin/structure/actions/advanced/configure'] = array(
+    'title' => 'Configure an advanced action',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('trigger_actions_advanced_configure'),
+    'access arguments' => array('administer trigger_actions'),
+    'type' => MENU_VISIBLE_IN_BREADCRUMB,
+    'file' => 'trigger_actions.admin.inc',
+  );
+  return $items;
+}
+
+/**
+ * Access callback: Determines if triggers can be unassigned.
+ *
+ * @return bool
+ *   TRUE if there are triggers that the user can unassign, FALSE otherwise.
+ *
+ * @see trigger_actions_menu()
+ */
+function trigger_actions_menu_unassign_access() {
+  if (!user_access('administer actions')) {
+    return FALSE;
+  }
+  $count = db_select('trigger_actions_assignments')
+    ->countQuery()
+    ->execute()
+    ->fetchField();
+  return $count > 0;
+}
+
+/**
+ * Implements hook_trigger_actions_info().
+ *
+ * Defines all the triggers that this module provides.
+ * Other modules may add more triggers.
+ */
+function trigger_actions_trigger_actions_info() {
+  return array(
+    'node' => array(
+      'node_presave' => array(
+        'label' => t('When either saving new content or updating existing content'),
+      ),
+      'node_insert' => array(
+        'label' => t('After saving new content'),
+      ),
+      'node_update' => array(
+        'label' => t('After saving updated content'),
+      ),
+      'node_delete' => array(
+        'label' => t('After deleting content'),
+      ),
+      'node_view' => array(
+        'label' => t('When content is viewed by an authenticated user'),
+      ),
+    ),
+    'comment' => array(
+      'comment_presave' => array(
+        'label' => t('When either saving a new comment or updating an existing comment'),
+      ),
+      'comment_insert' => array(
+        'label' => t('After saving a new comment'),
+      ),
+      'comment_update' => array(
+        'label' => t('After saving an updated comment'),
+      ),
+      'comment_delete' => array(
+        'label' => t('After deleting a comment'),
+      ),
+      'comment_view' => array(
+        'label' => t('When a comment is being viewed by an authenticated user'),
+      ),
+    ),
+    'taxonomy' => array(
+      'taxonomy_term_insert' => array(
+        'label' => t('After saving a new term to the database'),
+      ),
+      'taxonomy_term_update' => array(
+        'label' => t('After saving an updated term to the database'),
+      ),
+      'taxonomy_term_delete' => array(
+        'label' => t('After deleting a term'),
+      ),
+    ),
+    'system' => array(
+      'cron' => array(
+        'label' => t('When cron runs'),
+      ),
+    ),
+    'user' => array(
+      'user_insert' => array(
+        'label' => t('After creating a new user account'),
+      ),
+      'user_update' => array(
+        'label' => t('After updating a user account'),
+      ),
+      'user_delete' => array(
+        'label' => t('After a user has been deleted'),
+      ),
+      'user_login' => array(
+        'label' => t('After a user has logged in'),
+      ),
+      'user_logout' => array(
+        'label' => t('After a user has logged out'),
+      ),
+      'user_view' => array(
+        'label' => t("When a user's profile is being viewed"),
+      ),
+    ),
+  );
+}
+
+/**
+ * Gets the action IDs of actions to be executed for a trigger.
+ *
+ * @param $trigger_name
+ *   The name of the trigger being fired.
+ * @return
+ *   An array whose keys are action IDs (aid) that the user has associated with
+ *   this trigger, and whose values are arrays containing the action type and
+ *   label.
+ */
+function trigger_actions_get_assigned_actions($trigger_name) {
+  $actions = &backdrop_static(__FUNCTION__, array());
+  if (!isset($actions[$trigger_name])) {
+    $actions[$trigger_name] = db_query("SELECT ta.aid, a.type, a.callback, a.label, a.node_type, a.node_ID FROM {trigger_actions_assignments} ta LEFT JOIN {trigger_actions} a ON ta.aid = a.aid WHERE ta.trigger_name = :trigger_name ORDER BY ta.weight", array(
+      ':trigger_name' => $trigger_name,
+    ))->fetchAllAssoc('aid', PDO::FETCH_ASSOC);
+  }
+  return $actions[$trigger_name];
+}
+
+
+/**
+ * Implements hook_theme().
+ */
+function trigger_actions_theme() {
+  return array(
+    'trigger_actions_display' => array(
+      'render element' => 'element',
+      'file' => 'trigger_actions.theme.inc',
+    ),
+  );
+}
+
+/**
+ * Implements hook_forms().
+ *
+ * We re-use code by using the same assignment form definition for each hook.
+ */
+function trigger_actions_forms() {
+  $trigger_info = _trigger_actions_get_all_info();
+  $forms = array();
+  foreach ($trigger_info as $module => $hooks) {
+    foreach ($hooks as $hook => $description) {
+      $forms['trigger_actions_' . $hook . '_assign_form'] = array('callback' => 'trigger_actions_assign_form');
+    }
+  }
+  return $forms;
+}
+
+/**
+ * Retrieves and caches information from hook_trigger_actions_info() implementations
+ * From this module and any others that have implemented hook_trigger_actions_info
+ */
+function _trigger_actions_get_all_info() {
+  $trigger_names = &backdrop_static(__FUNCTION__);
+
+  if (!isset($trigger_names)) {
+    $trigger_names = module_invoke_all('trigger_actions_info');
+    backdrop_alter('trigger_actions_info', $trigger_names);
+  }
+  return $trigger_names;
+}
+
+/**
+ * Loads associated objects for node triggers.
+ *
+ * When an action is called in a context that does not match its type, the
+ * object that the action expects must be retrieved. For example, when an action
+ * that works on users is called during a node hook implementation, the user
+ * object is not available since the node hook call doesn't pass it. So here we
+ * load the object the action expects.
+ *
+ * @param $type
+ *   The type of action that is about to be called.
+ * @param $node
+ *   The node that was passed via the node hook.
+ *
+ * @return
+ *   The object expected by the action that is about to be called.
+ */
+function _trigger_actions_normalize_node_context($type, $node) {
+  // Note that comment-type actions are not supported in node contexts,
+  // because we wouldn't know which comment to choose.
+  switch ($type) {
+    // An action that works on users is being called in a node context.
+    // Load the user object of the node's author.
+    case 'user':
+      return user_load($node->uid);
+  }
+}
+
+/**
+ * Calls action functions for node triggers.
+ *
+ * @param $node
+ *   Node object.
+ * @param $op
+ *   Operation to trigger.
+ * @param $a3
+ *   Additional argument to action function.
+ * @param $a4
+ *   Additional argument to action function.
+ */
+
+
+function _trigger_actions_node($node, $trigger_name, $a3 = NULL, $a4 = NULL) {
+  // Keep objects for reuse so that changes actions make to objects can persist.
+  static $objects;
+  // Prevent recursion by tracking which operations have already been called.
+  static $recursion;
+  module_load_include('inc', 'trigger_actions');
+  $aids = trigger_actions_get_assigned_actions($trigger_name);
+  if (!$aids) {
+    return;
+  }
+
+  if (isset($recursion[$trigger_name])) {
+    return;
+  }
+  $recursion[$trigger_name] = TRUE;
+
+  $context = array(
+    'group' => 'node',
+    'trigger_name' => $trigger_name,
+  );
+  // We need to get the expected object if the action's type is not 'node'.
+  // We keep the object in $objects so we can reuse it if we have multiple actions
+  // that make changes to an object.
+  foreach ($aids as $aid => $info) {
+    $node_type = isset($info['node_type']) ? $info['node_type'] : '';
+    $node_id = isset($info['node_ID']) ? $info['node_ID'] : 0;
+    // Check whether node type or node ID is restricted for this action.
+    if (((strlen($node_type) > 2) && ($node->type <> $node_type)) OR (($node_id > 0) && ($node->nid <> $node_id))) {
+      return;
+    }
+    $type = $info['type'];
+    if ($type != 'node') {
+      if (!isset($objects[$type])) {
+        $objects[$type] = _trigger_actions_normalize_node_context($type, $node);
+      }
+      // Since we know about the node, we pass that info along to the action.
+      $context['node'] = $node;
+      $result = trigger_actions_do($aid, $objects[$type], $context, $a3, $a4);
+    }
+    else {
+      trigger_actions_do($aid, $node, $context, $a3, $a4);
+    }
+  }
+  unset($recursion[$trigger_name]);
+}
+
+/**
+ * Implements hook_node_view().
+ */
+function trigger_actions_node_view($node, $view_mode) {
+  _trigger_actions_node($node, 'node_view', $view_mode);
+}
+
+/**
+ * Implements hook_node_update().
+ */
+function trigger_actions_node_update($node) {
+  _trigger_actions_node($node, 'node_update');
+}
+
+/**
+ * Implements hook_node_presave().
+ */
+function trigger_actions_node_presave($node) {
+  _trigger_actions_node($node, 'node_presave');
+}
+
+/**
+ * Implements hook_node_insert().
+ */
+function trigger_actions_node_insert($node) {
+  _trigger_actions_node($node, 'node_insert');
+}
+
+/**
+ * Implements hook_node_predelete().
+ */
+function trigger_actions_node_predelete($node) {
+  _trigger_actions_node($node, 'node_delete');
+}
+
+/**
+ * Loads associated objects for comment triggers.
+ *
+ * When an action is called in a context that does not match its type, the
+ * object that the action expects must be retrieved. For example, when an action
+ * that works on nodes is called during the comment hook, the node object is not
+ * available since the comment hook doesn't pass it. So here we load the object
+ * the action expects.
+ *
+ * @param $type
+ *   The type of action that is about to be called.
+ * @param $comment
+ *   The comment that was passed via the comment hook.
+ *
+ * @return
+ *   The object expected by the action that is about to be called.
+ */
+function _trigger_actions_normalize_comment_context($type, $comment) {
+  switch ($type) {
+    // An action that works with nodes is being called in a comment context.
+    case 'node':
+      return node_load(is_array($comment) ? $comment['nid'] : $comment->nid);
+
+    // An action that works on users is being called in a comment context.
+    case 'user':
+      return user_load(is_array($comment) ? $comment['uid'] : $comment->uid);
+  }
+}
+
+/**
+ * Implements hook_comment_presave().
+ */
+function trigger_actions_comment_presave($comment) {
+  _trigger_actions_comment($comment, 'comment_presave');
+}
+
+/**
+ * Implements hook_comment_insert().
+ */
+function trigger_actions_comment_insert($comment) {
+  _trigger_actions_comment($comment, 'comment_insert');
+}
+
+/**
+ * Implements hook_comment_update().
+ */
+function trigger_actions_comment_update($comment) {
+  _trigger_actions_comment($comment, 'comment_update');
+}
+
+/**
+ * Implements hook_comment_delete().
+ */
+function trigger_actions_comment_delete($comment) {
+  _trigger_actions_comment($comment, 'comment_delete');
+}
+
+/**
+ * Implements hook_comment_view().
+ */
+function trigger_actions_comment_view($comment) {
+  _trigger_actions_comment($comment, 'comment_view');
+}
+
+/**
+ * Calls action functions for comment triggers.
+ *
+ * @param $a1
+ *   Comment object or array of form values.
+ * @param $op
+ *   Operation to trigger.
+ */
+function _trigger_actions_comment($a1, $trigger_name) {
+  // Keep objects for reuse so that changes actions make to objects can persist.
+  static $objects;
+  $aids = trigger_actions_get_assigned_actions($trigger_name);
+  $context = array(
+    'group' => 'comment',
+    'trigger_name' => $trigger_name,
+  );
+  // We need to get the expected object if the action's type is not 'comment'.
+  // We keep the object in $objects so we can reuse it if we have multiple
+  // actions that make changes to an object.
+  foreach ($aids as $aid => $info) {
+    $type = $info['type'];
+    if ($type != 'comment') {
+      if (!isset($objects[$type])) {
+        $objects[$type] = _trigger_actions_normalize_comment_context($type, $a1);
+      }
+      // Since we know about the comment, we pass it along to the action
+      // in case it wants to peek at it.
+      $context['comment'] = (object) $a1;
+      trigger_actions_do($aid, $objects[$type], $context);
+    }
+    else {
+      trigger_actions_do($aid, $a1, $context);
+    }
+  }
+}
+
+/**
+ * Implements hook_cron().
+ */
+function trigger_actions_cron() {
+  module_load_include('inc', 'trigger_actions');
+  trigger_actions_synchronize();
+
+  $aids = trigger_actions_get_assigned_actions('cron');
+  $context = array(
+    'group' => 'cron',
+    'trigger_name' => 'cron',
+  );
+  // Cron does not act on any specific object.
+  $object = NULL;
+  // need here to step through actions one at a time
+  foreach ($aids as $name => $info) {
+    trigger_actions_do($name, $object, $context);
+  }
+}
+
+/**
+ * Loads associated objects for user triggers.
+ *
+ * When an action is called in a context that does not match its type, the
+ * object that the action expects must be retrieved. For example, when an action
+ * that works on nodes is called during the user trigger, the node object is not
+ * available since the user trigger doesn't pass it. So here we load the object the
+ * action expects.
+ *
+ * @param $type
+ *   The type of action that is about to be called.
+ * @param $account
+ *   The account object that was passed via the user trigger.
+ * @return
+ *   The object expected by the action that is about to be called.
+ */
+function _trigger_actions_normalize_user_context($type, $account) {
+  // Note that comment-type actions are not supported in user contexts,
+  // because we wouldn't know which comment to choose.
+  switch ($type) {
+    // An action that works with nodes is being called in a user context.
+    // If a single node is being viewed, return the node.
+    case 'node':
+      // If we are viewing an individual node, return the node.
+      if (arg(0) == 'node' && is_numeric(arg(1)) && arg(2) == NULL) {
+        return node_load(array('nid' => arg(1)));
+      }
+      break;
+  }
+}
+
+/**
+ * Implements hook_user_login().
+ */
+function trigger_actions_user_login(&$edit, $account) {
+  _trigger_actions_user('user_login', $edit, $account);
+}
+
+/**
+ * Implements hook_user_logout().
+ */
+function trigger_actions_user_logout($account) {
+  $edit = array();
+  _trigger_actions_user('user_logout', $edit, $account);
+}
+
+/**
+ * Implements hook_user_insert().
+ */
+function trigger_actions_user_insert(&$edit, $account) {
+  _trigger_actions_user('user_insert', $edit, $account);
+}
+
+/**
+ * Implements hook_user_update().
+ */
+function trigger_actions_user_update(&$edit, $account) {
+  _trigger_actions_user('user_update', $edit, $account);
+}
+
+/**
+ * Implements hook_user_cancel().
+ */
+function trigger_actions_user_cancel($edit, $account, $method) {
+  switch ($method) {
+    case 'user_cancel_reassign':
+      _trigger_actions_user('user_delete', $edit, $account, $method);
+      break;
+  }
+}
+
+/**
+ * Implements hook_user_predelete().
+ */
+function trigger_actions_user_predelete($account) {
+  $edit = array();
+  _trigger_actions_user('user_delete', $edit, $account);
+}
+
+/**
+ * Implements hook_user_view().
+ */
+function trigger_actions_user_view($account) {
+  $edit = NULL;
+  _trigger_actions_user('user_view', $edit, $account);
+}
+
+/**
+ * Calls action functions for user triggers.
+ */
+function _trigger_actions_user($trigger_name, &$edit, $account, $method = NULL) {
+  // Keep objects for reuse so that changes actions make to objects can persist.
+  static $objects;
+  $aids = trigger_actions_get_assigned_actions($trigger_name);
+  $context = array(
+    'group' => 'user',
+    'trigger_name' => $trigger_name,
+    'form_values' => &$edit,
+  );
+  foreach ($aids as $aid => $info) {
+    $type = $info['type'];
+    if ($type != 'user') {
+      if (!isset($objects[$type])) {
+        $objects[$type] = _trigger_actions_normalize_user_context($type, $account);
+      }
+      $context['user'] = $account;
+      trigger_actions_do($aid, $objects[$type], $context);
+    }
+    else {
+      trigger_actions_do($aid, $account, $context, $method);
+    }
+  }
+}
+
+/**
+ * Calls action functions for taxonomy triggers.
+ *
+ * @param $trigger_name
+ *   trigger to trigger actions for taxonomy_term_insert(),
+ *   taxonomy_term_update(), and taxonomy_term_delete().
+ * @param $array
+ *   Item on which operation is being performed, either a term or
+ *   form values.
+ */
+function _trigger_actions_taxonomy($trigger_name, $array) {
+  $aids = trigger_actions_get_assigned_actions($trigger_name);
+  $context = array(
+    'group' => 'taxonomy',
+    'trigger_name' => $trigger_name
+  );
+  // need here to step through actions one at a time
+  foreach ($aids as $name => $info) {
+    trigger_actions_do($name, $array, $context);
+  }
+  trigger_actions_do(array_keys($aids), (object) $array, $context);
+}
+
+/**
+ * Implements hook_taxonomy_term_insert().
+ */
+function trigger_actions_taxonomy_term_insert($term) {
+  _trigger_actions_taxonomy('taxonomy_term_insert', (array) $term);
+}
+
+/**
+ * Implements hook_taxonomy_term_update().
+ */
+function trigger_actions_taxonomy_term_update($term) {
+  _trigger_actions_taxonomy('taxonomy_term_update', (array) $term);
+}
+
+/**
+ * Implements hook_taxonomy_term_delete().
+ */
+function trigger_actions_taxonomy_term_delete($term) {
+  _trigger_actions_taxonomy('taxonomy_term_delete', (array) $term);
+}
+
+/**
+ * Implements hook_actions_delete().
+ *
+ * Removes all trigger entries for the given action, when an action is deleted.
+ */
+function trigger_actions_actions_delete($aid) {
+  config_clear('trigger_actions.settings', "trigger_assignments.$aid");
+}
+
+/**
+ * Gathers information about tabs on the triggers administration screen.
+ *
+ * @return
+ *   Array of modules that have triggers, with the keys being the
+ *   machine-readable name of the module, and the values being the
+ *   human-readable name of the module.
+ */
+function _trigger_actions_tab_information() {
+  // Gather information about all triggers and modules.
+  $trigger_info = _trigger_actions_get_all_info();
+  $modules = system_get_info('module');
+  $modules = array_intersect_key($modules, $trigger_info);
+
+  $return_info = array();
+  foreach ($modules as $name => $info) {
+    $return_info[$name] = $info['name'];
+  }
+
+  return $return_info;
+}
+
+/**
+ * Implements hook_config_info().
+ */
+function trigger_actions_config_info() {
+  $prefixes['trigger_actions.settings'] = array(
+    'label' => t('Trigger Actions'),
+    'group' => t('Configuration'),
+  );
+  return $prefixes;
+}
+
+
+/***************SEND EMAIL FUNCTIONS***********************************/
+/**
+ * Implements hook_action_info().
+ */
+function trigger_actions_action_info() {
+  return array(
+    'trigger_actions_send_email_action' => array(
+      'type' => 'system',
+      'label' => t('Send email'),
+    ),
+  );
+}
+
+/**
+ * Return a form definition so the Send email action can be configured.
+ *
+ * @param $context
+ *   Default values (if we are editing an existing action instance).
+ *
+ * @return
+ *   Form definition.
+ *
+ * @see trigger_actions_send_email_action_validate()
+ * @see trigger_actions_send_email_action_submit()
+ */
+function trigger_actions_send_email_action_form($context) {
+  // Set default values for form.
+  if (!isset($context['recipient'])) {
+    $context['recipient'] = '';
+  }
+  if (!isset($context['subject'])) {
+    $context['subject'] = '';
+  }
+  if (!isset($context['message'])) {
+    $context['message'] = '';
+  }
+
+  $form['recipient'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Recipient'),
+    '#default_value' => $context['recipient'],
+    '#maxlength' => '254',
+    '#description' => t('The email address to which the message should be sent OR enter [node:author:mail], [comment:author:mail], etc. if you would like to send an email to the author of the original post.'),
+  );
+  $form['subject'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Subject'),
+    '#default_value' => $context['subject'],
+    '#maxlength' => '254',
+    '#description' => t('The subject of the message.'),
+  );
+  $form['message'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Message'),
+    '#default_value' => $context['message'],
+    '#cols' => '60',
+    '#rows' => '4',
+    '#description' => t('The message that should be sent. You may include placeholders like [node:title], [user:name], and [comment:body] to represent data that will be different each time message is sent. Not all placeholders will be available in all contexts.'),
+  );
+  return $form;
+}
+
+/**
+ * Validate trigger_actions_send_email_action form submissions.
+ */
+function trigger_actions_send_email_action_validate($form, $form_state) {
+  $form_values = $form_state['values'];
+  // Validate the configuration form.
+  if (!valid_email_address($form_values['recipient']) && strpos($form_values['recipient'], ':mail') === FALSE) {
+    // We want the literal %author placeholder to be emphasized in the error message.
+    form_set_error('recipient', t('Enter a valid email address or use a token email address such as %author.', array('%author' => '[node:author:mail]')));
+  }
+}
+
+/**
+ * Process trigger_actions_send_email_action form submissions.
+ */
+function trigger_actions_send_email_action_submit($form, $form_state) {
+  $form_values = $form_state['values'];
+  // Process the HTML form to store configuration. The keyed array that
+  // we return will be serialized to the database.
+  $params = array(
+    'recipient' => $form_values['recipient'],
+    'subject' => $form_values['subject'],
+    'message' => $form_values['message'],
+  );
+  return $params;
+}
+
+/**
+ * Sends an email message.
+ *
+ * @param object $entity
+ *   An optional node object, which will be added as $context['node'] if
+ *   provided.
+ * @param array $context
+ *   Array with the following elements:
+ *   - 'recipient': email message recipient. This will be passed through
+ *     token_replace().
+ *   - 'subject': The subject of the message. This will be passed through
+ *     token_replace().
+ *   - 'message': The message to send. This will be passed through
+ *     token_replace().
+ *   - Other elements will be used as the data for token replacement.
+ *
+ * @ingroup actions
+ */
+function trigger_actions_send_email_action($entity, $context) {
+  if (empty($context['node'])) {
+    $context['node'] = $entity;
+  }
+  $recipient = token_replace($context['recipient'], $context);
+
+  // If the recipient is a registered user with a language preference, use
+  // the recipient's preferred language. Otherwise, use the system default
+  // language.
+  $recipient_account = user_load_by_mail($recipient);
+  if ($recipient_account) {
+    $language = user_preferred_language($recipient_account);
+  }
+  else {
+    $language = language_default();
+  }
+  $params = array('context' => $context);
+
+  if (backdrop_mail('trigger_actions', 'action_send_email', $recipient, $language, $params)) {
+    watchdog('action', 'Sent email to %recipient', array('%recipient' => $recipient));
+  }
+  else {
+    watchdog('error', 'Unable to send email to %recipient', array('%recipient' => $recipient));
+  }
+}
+
+/**
+ * Implements hook_mail().
+ */
+function trigger_actions_mail($key, &$message, $params) {
+  $context = $params['context'];
+
+  $subject = token_replace($context['subject'], $context);
+  $body = token_replace($context['message'], $context);
+
+  $message['subject'] .= str_replace(array("\r", "\n"), '', $subject);
+  $message['body'][] = $body;
+}
+
+
+/**
+ * Implements hook_autoload_info().
+ */
+function trigger_actions_autoload_info() {
+  return array(
+    'trigger_actions' => 'trigger_actions.inc',
+  );
+}
