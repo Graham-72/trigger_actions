@@ -390,7 +390,7 @@ function trigger_actions_lists($type) {
       if (!empty($pager)) {
         $row[] = array(array('data' => $pager, 'colspan' => '3'));
       }
-      $build['trigger_actions_header'] = array('#markup' => '<h3>' . t('Configurable actions:') . '</h3><p>' . t('These actions have configuration settings and may be configured to create an Advanced Action.') . '<br/>' .t('Before they can be assigned to a trigger they need to be configured by creating a new variant as an advanced action.') . '</p>' );
+      $build['trigger_actions_header'] = array('#markup' => '<h3>' . t('Configurable actions:') . '</h3><p>' . t('These actions have configuration settings and may be configured to create an Advanced Action.') . '<br/>' . t('Before they can be assigned to a trigger they need to be configured by creating a new variant as an advanced action.') . '</p>');
       $build['trigger_actions_table'] = array(
         '#markup' => theme('table', array(
           'header' => $header,
@@ -504,7 +504,7 @@ function trigger_actions_simple_configure($form, &$form_state, $action = NULL) {
     '#type' => 'textarea',
     '#title' => t('Triggers'),
     '#default_value' => $data['trigger_names'],
-    '#description' => t("A string containing the name of the Triggers that may use this action . Separate names by space or line . Use 'any' if all may be used . "),
+    '#description' => t("A string containing the name of the Triggers that may use this action. Separate names by space or line. Use 'any' if all may be used.<br/><strong>Important</strong> - Not all triggers and actions are compatible so change this setting with care. "),
     '#weight' => -11
   );
   $form['actions']['submit'] = array(
@@ -629,10 +629,10 @@ function trigger_actions_advanced_configure($form, &$form_state, $action) {
   );
   $form['actions_nodetype'] = array(
     '#type' => 'radios',
-    '#title' => t('Optional - Select the node type for this action.'),
+    '#title' => t('Optional - Select a node type for this action.'),
     '#options' => $node_options,
     '#default_value' => $node_default,
-    '#description' => t('This action can be limited to apply to only one type of node.')
+    '#description' => t('This action can be limited to apply to only one type of node. If no selection is made it will apply to all types.')
   );
   $form['actions_nid'] = array(
     '#type' => 'textfield',
