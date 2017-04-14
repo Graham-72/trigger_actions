@@ -257,15 +257,15 @@ function trigger_actions_synchronize($delete_orphans = FALSE) {
       // is there a settings for the triggers for this action
       // if so, copy it to the database too.
       $this_module = $array['module'];
-      if(($this_module == 'node') OR ($this_module == 'comment') OR ($this_module == 'user') OR ($this_module == 'system') OR ($this_module == 'path')){
+      if (($this_module == 'node') OR ($this_module == 'comment') OR ($this_module == 'user') OR ($this_module == 'system') OR ($this_module == 'path')) {
         $this_module = 'trigger_actions';
       }
-      $triggers = config_get("$this_module.settings","triggers.$action");
-      if(isset($triggers)){
+      $triggers = config_get("$this_module.settings", "triggers.$action");
+      if (isset($triggers)) {
         $trigger_names = ' ';
-        foreach($triggers as $this_trigger => $value) {
-          if($value == 1){
-            $trigger_names = $trigger_names.' '.$this_trigger;
+        foreach ($triggers as $this_trigger => $value) {
+          if ($value == 1) {
+            $trigger_names = $trigger_names . ' ' . $this_trigger;
           }
         }
       }
