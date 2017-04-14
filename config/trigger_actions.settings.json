@@ -3,47 +3,59 @@
   "actions_max_stack": 35,
   "triggers": {
     "node_publish_action": {
-      "node_presave": 1,
       "comment_insert": 1,
       "comment_update": 1,
       "comment_delete": 1
+    },
+    "node_publish_trigger_action": {
+      "node_presave": 1
     },
     "node_unpublish_action": {
-      "node_presave": 1,
       "comment_insert": 1,
       "comment_update": 1,
       "comment_delete": 1
+    },
+    "node_unpublish_trigger_action": {
+      "node_presave": 1
     },
     "node_make_sticky_action": {
-      "node_presave": 1,
       "comment_insert": 1,
       "comment_update": 1,
       "comment_delete": 1
+    },
+    "node_make_sticky_trigger_action": {
+      "node_presave": 1
     },
     "node_make_unsticky_action": {
-      "node_presave": 1,
       "comment_insert": 1,
       "comment_update": 1,
       "comment_delete": 1
+    },
+    "node_make_unsticky_trigger_action": {
+      "node_presave": 1
     },
     "node_promote_action": {
-      "node_presave": 1,
       "comment_insert": 1,
       "comment_update": 1,
       "comment_delete": 1
+    },
+    "node_promote_trigger_action": {
+      "node_presave": 1
     },
     "node_unpromote_action": {
-      "node_presave": 1,
       "comment_insert": 1,
       "comment_update": 1,
       "comment_delete": 1
     },
-    "comment_publish_action": {
+    "node_unpromote_trigger_action": {
+      "node_presave": 1
+    },
+    "comment_publish_trigger_action": {
       "comment_presave": 1,
       "comment_insert": 1,
       "comment_update": 1
     },
-    "comment_unpublish_action": {
+    "comment_unpublish_trigger_action": {
       "comment_presave": 1,
       "comment_insert": 1,
       "comment_update": 1
@@ -54,13 +66,10 @@
     "trigger_actions_send_email_action": {
       "any": 1
     },
-    "path_node_update_action": {
-    },
-    "path_taxonomy_term_update_action": {
-    },
-    "path_user_update_action": {
-    },
-    "file_delete": {
-    }
+    "path_node_update_action": [],
+    "path_taxonomy_term_update_action": [],
+    "path_user_update_action": [],
+    "file_delete": []
   }
 }
+
