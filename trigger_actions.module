@@ -104,8 +104,8 @@ function trigger_actions_menu() {
     'file' => 'trigger_actions.admin.inc',
   );
   $items['admin/structure/actions/orphan'] = array(
-      'title' => 'Remove orphans',
-      'page callback' => 'trigger_actions_remove_orphans',
+    'title' => 'Remove orphans',
+    'page callback' => 'trigger_actions_remove_orphans',
     'access arguments' => array('administer trigger_actions'),
     'type' => MENU_CALLBACK,
     'file' => 'trigger_actions.admin.inc',
@@ -489,6 +489,7 @@ function trigger_actions_comment_view($comment) {
  */
 function _trigger_actions_comment($a1, $trigger_name) {
   // Keep objects for reuse so that changes actions make to objects can persist.
+  module_load_include('inc', 'trigger_actions');
   static $objects;
   $aids = trigger_actions_get_assigned_actions($trigger_name);
   $context = array(
@@ -736,12 +737,51 @@ function trigger_actions_config_info() {
 }
 
 
-/***************SEND EMAIL FUNCTIONS***********************************/
 /**
  * Implements hook_action_info().
  */
 function trigger_actions_action_info() {
   return array(
+    'node_publish_trigger_action' => array(
+      'type' => 'node',
+      'label' => t('Publish content when saving'),
+      'callback' => 'node_publish_trigger_action'
+    ),
+    'node_unpublish_trigger_action' => array(
+      'type' => 'node',
+      'label' => t('Unpublish content when saving'),
+      'callback' => 'node_unpublish_trigger_action'
+    ),
+    'node_make_sticky_trigger_action' => array(
+      'type' => 'node',
+      'label' => t('Make content sticky when saving'),
+      'callback' => 'node_make_sticky_trigger_action',
+    ),
+    'node_make_unsticky_trigger_action' => array(
+      'type' => 'node',
+      'label' => t('Make content unsticky when saving'),
+      'callback' => 'node_make_unsticky_trigger_action',
+    ),
+    'node_promote_trigger_action' => array(
+      'type' => 'node',
+      'label' => t('Promote content when saving'),
+      'callback' => 'node_promote_trigger_action',
+    ),
+    'node_unpromote_trigger_action' => array(
+      'type' => 'node',
+      'label' => t('Remove promotion when saving'),
+      'callback' => 'node_unpromote_trigger_action',
+    ),
+    'comment_publish_trigger_action' => array(
+      'label' => t('Publish comment when saving'),
+      'type' => 'comment',
+      'callback' => 'comment_publish_trigger_action',
+    ),
+    'comment_unpublish_trigger_action' => array(
+      'label' => t('Unpublish comment when saving'),
+      'type' => 'comment',
+      'callback' => 'comment_unpublish_trigger_action',
+    ),
     'trigger_actions_send_email_action' => array(
       'type' => 'system',
       'label' => t('Send email'),
@@ -749,6 +789,42 @@ function trigger_actions_action_info() {
   );
 }
 
+/*************CORE NODE ACTIONS WITHOUT SAVE***************************/
+
+function node_publish_trigger_action(Node $node, &$context) {
+  $node->status = NODE_PUBLISHED;
+}
+
+function node_unpublish_trigger_action(Node $node, &$context) {
+  $node->status = NODE_NOT_PUBLISHED;
+}
+
+function node_make_sticky_trigger_action(Node $node, &$context) {
+  $node->sticky = NODE_STICKY;
+}
+
+function node_make_unsticky_trigger_action(Node $node, &$context) {
+  $node->sticky = NODE_NOT_STICKY;
+}
+
+function node_promote_trigger_action(Node $node, &$context) {
+  $node->promote = NODE_PROMOTED;
+}
+
+function node_unpromote_trigger_action(Node $node, &$context) {
+  $node->promote = NODE_NOT_PROMOTED;
+}
+
+function comment_publish_trigger_action($comment, $context = array()) {
+  $comment->status = COMMENT_PUBLISHED;
+}
+
+function comment_unpublish_trigger_action($comment, $context = array()) {
+  $comment->status = COMMENT_NOT_PUBLISHED;
+}
+
+
+/***************SEND EMAIL FUNCTIONS***********************************/
 /**
  * Return a form definition so the Send email action can be configured.
  *
