@@ -88,6 +88,12 @@ The administrative pages for Actions enable these configurations to
 be set up and administered. There are separate pages listing the 
 Simple Actions, Configurable Actions and Advanced Actions.
 
+For example, the module can be used to send a pre-defined email to a
+specified address when triggered by a system action such as addition
+of new content of a particular type. This is achieved by creating a
+customised 'advanced action' by configuring a copy of the 'send email'
+action included in this module.
+
 In Drupal 7 hook_action_info provides a value 'triggers' which is an 
 array of the events (that is, hooks) that can trigger the action. This
 value is not included in Backdrop and so it is necessary to add this
