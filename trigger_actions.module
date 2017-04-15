@@ -130,6 +130,18 @@ function trigger_actions_menu() {
 }
 
 /**
+ * Implements hook_permission().
+ */
+function trigger_actions_permission() {
+  return array(
+    'administer trigger_actions' => array(
+      'title' => t('Administer actions and triggers'),
+      'description' => t('Allow access to administration pages for triggers and actions.'),
+    ),
+  );
+}
+
+/**
  * Access callback: Determines if triggers can be unassigned.
  *
  * @return bool
