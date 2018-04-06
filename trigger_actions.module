@@ -597,14 +597,14 @@ function trigger_actions_user_logout($account) {
 /**
  * Implements hook_user_insert().
  */
-function trigger_actions_user_insert(&$edit, $account) {
+function trigger_actions_user_insert($account) {
   _trigger_actions_user('user_insert', $edit, $account);
 }
 
 /**
  * Implements hook_user_update().
  */
-function trigger_actions_user_update(&$edit, $account) {
+function trigger_actions_user_update($account) {
   _trigger_actions_user('user_update', $edit, $account);
 }
 
