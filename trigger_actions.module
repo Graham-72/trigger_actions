@@ -6,6 +6,10 @@
  * triggered by other modules or by one of Backdrop's core API hooks.
  */
 
+/**
+  * Load include file.
+  */
+module_load_include('inc','trigger_actions','trigger_actions');
 
 /**
  * Implements hook_menu().
